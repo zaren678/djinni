@@ -66,12 +66,30 @@ object Enum {
   case class Option(ident: Ident, doc: Doc)
 }
 
-case class Record(ext: Ext, fields: Seq[Field], consts: Seq[Const], derivingTypes: Set[DerivingType]) extends TypeDef
+case class Record( name: String,
+                   ext: Ext,
+                   fields: Seq[Field],
+                   consts: Seq[Const],
+                   derivingTypes: Set[Object],
+                   var childTypes: List[TypeDecl],
+                   var parentType: TypeDecl) extends TypeDef {
+
+  //Need to override toString here to prevent stack overflow
+  override def toString = {
+    val theChildNames = if (childTypes.isEmpty) List[String]() else childTypes.map(t => t.ident.name)
+    val theParentName = if (parentType == null) "None" else parentType.ident.name
+
+    s"Record(Ext($ext),Fields($fields),Consts($consts),DerivingTypes($derivingTypes),ChildTypes($theChildNames),ParentType($theParentName))"
+  }
+}
 object Record {
   object DerivingType extends Enumeration {
     type DerivingType = Value
     val Eq, Ord = Value
   }
+
+
+
 }
 
 case class Interface(ext: Ext, methods: Seq[Interface.Method], consts: Seq[Const]) extends TypeDef

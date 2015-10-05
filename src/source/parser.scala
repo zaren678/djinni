@@ -17,6 +17,9 @@
 package djinni
 
 import java.io.{File, InputStreamReader, FileInputStream, Writer}
+import java.lang.String
+import java.lang.String
+import java.util
 
 import djinni.ast.Interface.Method
 import djinni.ast.Record.DerivingType.DerivingType
@@ -26,6 +29,7 @@ import java.util.{Map => JMap}
 import org.yaml.snakeyaml.Yaml
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import scala.math.Ordering.String
 import scala.util.parsing.combinator.RegexParsers
 import scala.util.parsing.input.{Position, Positional}
 
@@ -92,18 +96,25 @@ private object IdlParser extends RegexParsers {
     case ext~items~deriving => {
       val fields = items collect {case f: Field => f}
       val consts = items collect {case c: Const => c}
-      val derivingTypes = deriving.getOrElse(Set[DerivingType]())
-      Record(ext, fields, consts, derivingTypes)
+      val derivingTypes = deriving.getOrElse(Set[Object]())
+      Record( "Figuring this out",
+              ext = ext,
+              fields = fields,
+              consts = consts,
+              derivingTypes = derivingTypes,
+              childTypes = List(),
+              parentType = null)
     }
   }
   def field: Parser[Field] = doc ~ ident ~ ":" ~ typeRef ^^ {
     case doc~ident~_~typeRef => Field(ident, typeRef, doc)
   }
-  def deriving: Parser[Set[DerivingType]] = "deriving" ~> parens(rep1sepend(ident, ",")) ^^ {
+  def deriving: Parser[Set[Object]] = "deriving" ~> parens(rep1sepend(ident, ",")) ^^ {
     _.map(ident => ident.name match {
       case "eq" => Record.DerivingType.Eq
       case "ord" => Record.DerivingType.Ord
-      case _ => return err( s"""Unrecognized deriving type "${ident.name}"""")
+      case s:String => s
+      case _ => return err( """Unrecognized deriving type "${ident.name}"""")
     }).toSet
   }
 
@@ -124,7 +135,15 @@ private object IdlParser extends RegexParsers {
 
   def externTypeDecl: Parser[TypeDef] = externEnum | externInterface | externRecord
   def externEnum: Parser[Enum] = enumHeader ^^ { case _ => Enum(List()) }
-  def externRecord: Parser[Record] = recordHeader ~ opt(deriving) ^^ { case ext~deriving => Record(ext, List(), List(), deriving.getOrElse(Set[DerivingType]())) }
+  def externRecord: Parser[Record] = recordHeader ~ opt(deriving) ^^ {
+    case ext~deriving => Record( "Figuring this out",
+                                 ext,
+                                 List(),
+                                 List(),
+                                 deriving.getOrElse(Set[Object]()),
+                                 List(),
+                                 null )
+  }
   def externInterface: Parser[Interface] = interfaceHeader ^^ { case ext => Interface(ext, List(), List()) }
 
   def staticLabel: Parser[Boolean] = ("static ".r | "".r) ^^ {

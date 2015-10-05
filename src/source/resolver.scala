@@ -75,6 +75,11 @@ def resolve(metas: Scope, idl: Seq[TypeDecl]): Option[Error] = {
 
     for (typeDecl <- idl) {
       resolveConst(typeDecl.body)
+
+      typeDecl.body match {
+        case r: Record => resolveRecordDerivings( idl, typeDecl )
+        case _ =>
+      }
     }
 
   }
@@ -83,6 +88,8 @@ def resolve(metas: Scope, idl: Seq[TypeDecl]): Option[Error] = {
   }
   None
 }
+
+
 
 private def resolve(scope: Scope, typeDef: TypeDef) {
   typeDef match {
@@ -214,12 +221,14 @@ private def resolveRecord(scope: Scope, r: Record) {
     dupeChecker.check(f.ident)
     resolveRef(scope, f.ty)
     // Deriving Type Check
-    if (r.ext.any())
+    if (r.ext.any()) {
       if (r.derivingTypes.contains(DerivingType.Ord)) {
         throw new Error(f.ident.loc, "Cannot safely implement Ord on a record that may be extended").toException
       } else if (r.derivingTypes.contains(DerivingType.Eq)) {
         throw new Error(f.ident.loc, "Cannot safely implement Eq on a record that may be extended").toException
       }
+    }
+
     f.ty.resolved.base match {
       case MBinary | MList | MSet | MMap =>
         if (r.derivingTypes.contains(DerivingType.Ord))
@@ -260,6 +269,43 @@ private def resolveRecord(scope: Scope, r: Record) {
   for (c <- r.consts) {
     dupeChecker.check(c.ident)
     resolveRef(scope, c.ty)
+  }
+}
+
+private def resolveRecordDerivings( idl: Seq[TypeDecl], decl: TypeDecl ) {
+
+  var r: Record = null
+  decl.body match {
+    case r1: Record =>
+      r = r1
+    case _ =>
+      return;
+  }
+
+  //Make sure our record only derives from 1 other record excluding eq and ord
+  val theNumberDerived = r.derivingTypes.count( d => !d.equals(DerivingType.Ord) && !d.equals(DerivingType.Eq) )
+  if( theNumberDerived > 1 ) throw new Error( decl.ident.loc, "Records can only derive from one other record" ).toException
+
+  for (d <- r.derivingTypes) {
+    d match {
+      case s: String => {
+        val theTypeDecl = idl.find( t => t.ident.name.equals( s ) )
+        if( theTypeDecl.isEmpty ) throw new Error( decl.ident.loc, decl.ident.name + s" derives from $s but $s is not defined" ).toException
+        if( !theTypeDecl.get.body.isInstanceOf[Record] ) throw new Error( decl.ident.loc, "Records can only derive from other records" ).toException
+
+        val theParentRecord = theTypeDecl.get.body.asInstanceOf[Record]
+        if( r.derivingTypes.contains( Record.DerivingType.Eq ) && !theParentRecord.derivingTypes.contains( Record.DerivingType.Eq )) {
+          throw new Error( decl.ident.loc, "Record " + decl.ident.name + " derives from eq but parent does not, consider adding eq to parent record" ).toException
+        }
+        if( r.derivingTypes.contains( Record.DerivingType.Ord ) && !theParentRecord.derivingTypes.contains( Record.DerivingType.Ord )) {
+          throw new Error( decl.ident.loc, "Record "+ decl.ident.name + " derives from ord but parent does not, consider adding ord to parent record" ).toException
+        }
+
+        r.parentType = theTypeDecl.get
+        theParentRecord.childTypes = theParentRecord.childTypes :+ decl
+      }
+      case _ =>
+    }
   }
 }
 

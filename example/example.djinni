@@ -16,3 +16,19 @@ sort_items = interface +c {
 textbox_listener = interface +j +o {
     update(items: item_list);
 }
+
+grandparent_record = record {
+    parent_thing: string;
+} deriving( eq, ord )
+
+parent_record = record {
+    parent_thing: string;
+} deriving( eq, ord, grandparent_record )
+
+child_record = record {
+    child_thing: i32;
+} deriving( eq, ord, parent_record )
+
+child_record2 = record {
+    child_thing: i32;
+} deriving( eq, ord, parent_record )
