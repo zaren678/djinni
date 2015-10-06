@@ -182,8 +182,10 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
       }
 
       w.w("struct " + actualSelf + cppFinal + extendsFlag).bracedSemi {
-        //put a using so that using the baseclass is easier
-        w.wl( s"using BaseClass = ${qualifiedParentName};" )
+        if( theParentType != null ) {
+          //put a using so that using the baseclass is easier to use
+          w.wl(s"using BaseClass = ${qualifiedParentName};")
+        }
 
         generateHppConstants(w, r.consts)
         // Field definitions.
@@ -213,7 +215,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
 
         // Constructor.
         val theParentFields = getParentRecordFields(r)
-        if(r.fields.nonEmpty && theParentFields.nonEmpty) {
+        if(r.fields.nonEmpty || theParentFields.nonEmpty) {
           val theFields = theParentFields ++ r.fields
           w.wl
           writeAlignedCall(w, actualSelf + "(", theFields, ")", f => marshal.fieldType(f.ty) + " " + idCpp.local(f.ident) + "_")
@@ -235,7 +237,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
           w.wl("{}")
         }
 
-        if (r.ext.cpp) {
+        if (r.ext.cpp || r.childTypes.nonEmpty) {
           w.wl
           w.wl(s"virtual ~$actualSelf() = default;")
           w.wl
@@ -259,8 +261,13 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
         if (r.derivingTypes.contains(DerivingType.Eq)) {
           w.wl
           w.w(s"bool operator==(const $actualSelf& lhs, const $actualSelf& rhs)").braced {
-            if(!r.fields.isEmpty) {
+            if(r.fields.nonEmpty || (theParentRecord != null && theParentRecord.fields.nonEmpty)) {
               writeAlignedCall(w, "return ", r.fields, " &&", "", f => s"lhs.${idCpp.field(f.ident)} == rhs.${idCpp.field(f.ident)}")
+              if( theParentRecord != null ){
+                w.wl(" &&")
+                w.w(s"       static_cast<$actualSelf::BaseClass>(lhs) == static_cast<$actualSelf::BaseClass>(rhs)")
+              }
+
               w.wl(";")
             } else {
              w.wl("return true;")
@@ -282,6 +289,16 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
                 w.wl("return false;")
               }
             }
+
+            if( theParentRecord != null ){
+              w.w(s"if (static_cast<$actualSelf::BaseClass>(lhs) < static_cast<$actualSelf::BaseClass>(rhs)").braced {
+                w.wl("return true;")
+              }
+              w.w(s"if (static_cast<$actualSelf::BaseClass>(rhs) < static_cast<$actualSelf::BaseClass>(lhs)").braced {
+                w.wl("return false;")
+              }
+            }
+
             w.wl("return false;")
           }
           w.wl

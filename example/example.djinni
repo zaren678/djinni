@@ -22,6 +22,7 @@ grandparent_record_eq_ord = record {
 
 parent_record_eq_ord = record {
     parent_thing: string;
+    parent_thing2: i32;
 } deriving( eq, ord, grandparent_record_eq_ord )
 
 child_record_eq_ord = record {
