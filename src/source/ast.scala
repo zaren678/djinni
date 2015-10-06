@@ -66,8 +66,7 @@ object Enum {
   case class Option(ident: Ident, doc: Doc)
 }
 
-case class Record( name: String,
-                   ext: Ext,
+case class Record( ext: Ext,
                    fields: Seq[Field],
                    consts: Seq[Const],
                    derivingTypes: Set[Object],
@@ -87,9 +86,6 @@ object Record {
     type DerivingType = Value
     val Eq, Ord = Value
   }
-
-
-
 }
 
 case class Interface(ext: Ext, methods: Seq[Interface.Method], consts: Seq[Const]) extends TypeDef

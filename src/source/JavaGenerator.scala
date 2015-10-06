@@ -210,11 +210,21 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
     val refs = new JavaRefs()
     r.fields.foreach(f => refs.find(f.ty))
 
-    val (javaName, javaFinal) = if (r.ext.java) (ident.name + "_base", "") else (ident.name, " final")
+    val javaFinal = if (r.ext.java || r.childTypes.nonEmpty) "" else " final"
+    val javaName = if (r.ext.java) ident.name + "_base" else ident.name
     writeJavaFile(javaName, origin, refs.java, w => {
       writeDoc(w, doc)
       javaAnnotationHeader.foreach(w.wl)
       val self = marshal.typename(javaName, r)
+
+      val theParentType = r.parentType
+      val theParentRecord = if (theParentType != null) r.parentType.body.asInstanceOf[Record] else null
+      val extendsFlag = if (theParentRecord != null) {
+        val theParentJavaName = if (theParentRecord.ext.java) theParentType.ident.name + "_base" else theParentType.ident.name
+        s" extends " + marshal.typename(theParentJavaName, theParentType.body)
+      } else {
+        ""
+      }
 
       val comparableFlag =
         if (r.derivingTypes.contains(DerivingType.Ord)) {
@@ -222,7 +232,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
         } else {
           ""
         }
-      w.w(s"public$javaFinal class ${self + javaTypeParams(params)}$comparableFlag").braced {
+      w.w(s"public$javaFinal class ${self + javaTypeParams(params)}$extendsFlag$comparableFlag").braced {
         w.wl
         generateJavaConstants(w, r.consts)
         // Field definitions.
@@ -232,9 +242,15 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
         }
 
         // Constructor.
+        val parentFields = getParentRecordFields( r )
         w.wl
         w.wl(s"public $self(").nestedN(2) {
           val skipFirst = SkipFirst()
+          for (f <- parentFields) {
+            skipFirst { w.wl(",") }
+            marshal.nullityAnnotation(f.ty).map(annotation => w.w(annotation + " "))
+            w.w(marshal.typename(f.ty) + " " + idJava.local(f.ident))
+          }
           for (f <- r.fields) {
             skipFirst { w.wl(",") }
             marshal.nullityAnnotation(f.ty).map(annotation => w.w(annotation + " "))
@@ -243,6 +259,17 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
           w.wl(") {")
         }
         w.nested {
+          if( parentFields.nonEmpty ) {
+            w.w("super(")
+            val skipFirst = SkipFirst()
+            for (f <- parentFields) {
+              skipFirst {
+                w.w(",")
+              }
+              w.w(idJava.field(f.ident))
+            }
+            w.wl(");")
+          }
           for (f <- r.fields) {
             w.wl(s"this.${idJava.field(f.ident)} = ${idJava.local(f.ident)};")
           }
@@ -297,7 +324,13 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
                   case _ => throw new AssertionError("Unreachable")
                 }
               }
+
+              if( theParentType != null ){
+                skipFirst { w.wl(" &&") }
+                w.w( "super.equals(other)" )
+              }
             }
+
             w.wl(";")
           }
           // Also generate a hashCode function, since you shouldn't override one without the other.
@@ -311,6 +344,9 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
             w.wl("int hashCode = 17;")
             // Also pick an arbitrary prime to use as the multiplier.
             val multiplier = "31"
+            if( theParentType != null ){
+              w.wl( s"hashCode = hashCode * $multiplier + super.hashCode();" )
+            }
             for (f <- r.fields) {
               val fieldHashCode = f.ty.resolved.base match {
                 case MBinary => s"java.util.Arrays.hashCode(${idJava.field(f.ident)})"
@@ -344,11 +380,14 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
         w.wl("@Override")
         w.w("public String toString()").braced {
           w.w(s"return ").nestedN(2) {
-            w.wl(s""""${self}{" +""")
-            for (i <- 0 to r.fields.length-1) {
+            w.wl(s""""$self{" +""")
+            if( theParentType != null ) {
+              w.wl("super.toString() +")
+            }
+            for (i <- r.fields.indices) {
               val name = idJava.field(r.fields(i).ident)
               val comma = if (i > 0) """"," + """ else ""
-              w.wl(s"""${comma}"${name}=" + ${name} +""")
+              w.wl(s"""$comma"$name=" + $name +""")
             }
           }
           w.wl(s""""}";""")
@@ -373,6 +412,12 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
           val nonnullAnnotation = javaNonnullAnnotation.map(_ + " ").getOrElse("")
           w.w(s"public int compareTo($nonnullAnnotation$self other) ").braced {
             w.wl("int tempResult;")
+            if( theParentType != null ){
+              w.wl("tempResult = super.compareTo(other)")
+              w.w("if (tempResult != 0)").braced {
+                w.wl("return tempResult;")
+              }
+            }
             for (f <- r.fields) {
               f.ty.resolved.base match {
                 case MString => w.wl(s"tempResult = this.${idJava.field(f.ident)}.compareTo(other.${idJava.field(f.ident)});")

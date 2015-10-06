@@ -325,6 +325,18 @@ abstract class Generator(spec: Spec)
   def generateRecord(origin: String, ident: Ident, doc: Doc, params: Seq[TypeParam], r: Record)
   def generateInterface(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Interface)
 
+  def getParentRecordFields(r: Record): Seq[Field] = {
+    var theFields = Seq[Field]()
+
+    var theParent = r.parentType
+    while (theParent != null){
+      val theParentRecord = theParent.body.asInstanceOf[Record]
+      theFields = theParentRecord.fields ++ theFields
+      theParent = theParentRecord.parentType
+    }
+    theFields
+  }
+
   // --------------------------------------------------------------------------
   // Render type expression
 

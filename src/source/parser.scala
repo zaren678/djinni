@@ -97,8 +97,7 @@ private object IdlParser extends RegexParsers {
       val fields = items collect {case f: Field => f}
       val consts = items collect {case c: Const => c}
       val derivingTypes = deriving.getOrElse(Set[Object]())
-      Record( "Figuring this out",
-              ext = ext,
+      Record( ext = ext,
               fields = fields,
               consts = consts,
               derivingTypes = derivingTypes,
@@ -136,8 +135,7 @@ private object IdlParser extends RegexParsers {
   def externTypeDecl: Parser[TypeDef] = externEnum | externInterface | externRecord
   def externEnum: Parser[Enum] = enumHeader ^^ { case _ => Enum(List()) }
   def externRecord: Parser[Record] = recordHeader ~ opt(deriving) ^^ {
-    case ext~deriving => Record( "Figuring this out",
-                                 ext,
+    case ext~deriving => Record( ext,
                                  List(),
                                  List(),
                                  deriving.getOrElse(Set[Object]()),

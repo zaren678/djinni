@@ -1,3 +1,37 @@
+grandparent_record = record +j +c {
+    grandparent_thing: string;
+    grandparent_thing2: i16;
+}
+
+parent_record = record {
+    parent_thing: string;
+} deriving( grandparent_record )
+
+child_record = record {
+    child_thing: i32;
+} deriving( parent_record )
+
+child_record2 = record {
+    child_thing: i32;
+} deriving( parent_record )
+
+grandparent_record_eq_ord = record {
+    grandparent_thing: string;
+    grandparent_thing2: i16;
+} deriving( eq, ord )
+
+parent_record_eq_ord = record {
+    parent_thing: string;
+} deriving( eq, ord, grandparent_record_eq_ord )
+
+child_record_eq_ord = record {
+    child_thing: i32;
+} deriving( eq, ord, parent_record_eq_ord )
+
+child_record2_eq_ord = record {
+    child_thing: i32;
+} deriving( eq, ord, parent_record_eq_ord )
+
 item_list = record {
     items: list<string>;
 }
@@ -16,19 +50,3 @@ sort_items = interface +c {
 textbox_listener = interface +j +o {
     update(items: item_list);
 }
-
-grandparent_record = record {
-    parent_thing: string;
-} deriving( eq, ord )
-
-parent_record = record {
-    parent_thing: string;
-} deriving( eq, ord, grandparent_record )
-
-child_record = record {
-    child_thing: i32;
-} deriving( eq, ord, parent_record )
-
-child_record2 = record {
-    child_thing: i32;
-} deriving( eq, ord, parent_record )

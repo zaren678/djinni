@@ -135,7 +135,8 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
     refs.hpp.add("#include <utility>") // Add for std::move
 
     val self = marshal.typename(ident, r)
-    val (cppName, cppFinal) = if (r.ext.cpp) (ident.name + "_base", "") else (ident.name, " final")
+    val cppFinal = if (r.ext.cpp || r.childTypes.nonEmpty) "" else " final"
+    val cppName = if (r.ext.cpp) ident.name + "_base" else ident.name
     val actualSelf = marshal.typename(cppName, r)
 
     // Requiring the extended class
@@ -144,11 +145,46 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
       refs.cpp.add("#include "+q("../" + spec.cppFileIdentStyle(ident) + "." + spec.cppHeaderExt))
     }
 
+    val theParentType = r.parentType
+    val theParentRecord = if (theParentType != null) r.parentType.body.asInstanceOf[Record] else null
+
+    val theParentCppName = if (theParentRecord != null) {
+      if (theParentRecord.ext.cpp) theParentType.ident.name + "_base" else theParentType.ident.name
+    } else {
+      ""
+    }
+
+    if (theParentRecord != null){
+      refs.hpp.add("#include \"" + theParentCppName + "." + spec.cppHeaderExt + "\"")
+    }
+
     // C++ Header
     def writeCppPrototype(w: IndentWriter) {
       writeDoc(w, doc)
       writeCppTypeParams(w, params)
-      w.w("struct " + actualSelf + cppFinal).bracedSemi {
+
+      val qualifiedParentName = if( theParentRecord != null ){
+        if( theParentType.isInstanceOf[ExternTypeDecl] ){
+          //TODO check if external typedecl and use namespace
+          marshal.typename(theParentCppName, theParentType.body)
+        }
+        else{
+          marshal.typename(theParentCppName, theParentType.body)
+        }
+
+      } else {
+        ""
+      }
+      val extendsFlag = if (theParentRecord != null) {
+        s" : public " + qualifiedParentName
+      } else {
+        ""
+      }
+
+      w.w("struct " + actualSelf + cppFinal + extendsFlag).bracedSemi {
+        //put a using so that using the baseclass is easier
+        w.wl( s"using BaseClass = ${qualifiedParentName};" )
+
         generateHppConstants(w, r.consts)
         // Field definitions.
         for (f <- r.fields) {
@@ -157,28 +193,44 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
         }
 
         if (r.derivingTypes.contains(DerivingType.Eq)) {
+          //TODO base class?
           w.wl
           w.wl(s"friend bool operator==(const $actualSelf& lhs, const $actualSelf& rhs);")
           w.wl(s"friend bool operator!=(const $actualSelf& lhs, const $actualSelf& rhs);")
         }
         if (r.derivingTypes.contains(DerivingType.Ord)) {
+          //TODO base class?
           w.wl
           w.wl(s"friend bool operator<(const $actualSelf& lhs, const $actualSelf& rhs);")
           w.wl(s"friend bool operator>(const $actualSelf& lhs, const $actualSelf& rhs);")
         }
         if (r.derivingTypes.contains(DerivingType.Eq) && r.derivingTypes.contains(DerivingType.Ord)) {
+          //TODO base class?
           w.wl
           w.wl(s"friend bool operator<=(const $actualSelf& lhs, const $actualSelf& rhs);")
           w.wl(s"friend bool operator>=(const $actualSelf& lhs, const $actualSelf& rhs);")
         }
 
         // Constructor.
-        if(r.fields.nonEmpty) {
+        val theParentFields = getParentRecordFields(r)
+        if(r.fields.nonEmpty && theParentFields.nonEmpty) {
+          val theFields = theParentFields ++ r.fields
           w.wl
-          writeAlignedCall(w, actualSelf + "(", r.fields, ")", f => marshal.fieldType(f.ty) + " " + idCpp.local(f.ident) + "_")
+          writeAlignedCall(w, actualSelf + "(", theFields, ")", f => marshal.fieldType(f.ty) + " " + idCpp.local(f.ident) + "_")
           w.wl
           val init = (f: Field) => idCpp.field(f.ident) + "(std::move(" + idCpp.local(f.ident) + "_))"
-          w.wl(": " + init(r.fields.head))
+          if( theParentFields.nonEmpty ){
+            w.w( ": BaseClass(")
+            val skipFirst = SkipFirst()
+            for (f <- theParentFields) {
+              skipFirst { w.w(",") }
+              w.w( "std::move(" +idCpp.field(f.ident) + "_)")
+            }
+            w.wl( ")," )
+          } else {
+            w.w(": ")
+          }
+          w.w(init(r.fields.head))
           r.fields.tail.map(f => ", " + init(f)).foreach(w.wl)
           w.wl("{}")
         }
