@@ -195,19 +195,16 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
         }
 
         if (r.derivingTypes.contains(DerivingType.Eq)) {
-          //TODO base class?
           w.wl
           w.wl(s"friend bool operator==(const $actualSelf& lhs, const $actualSelf& rhs);")
           w.wl(s"friend bool operator!=(const $actualSelf& lhs, const $actualSelf& rhs);")
         }
         if (r.derivingTypes.contains(DerivingType.Ord)) {
-          //TODO base class?
           w.wl
           w.wl(s"friend bool operator<(const $actualSelf& lhs, const $actualSelf& rhs);")
           w.wl(s"friend bool operator>(const $actualSelf& lhs, const $actualSelf& rhs);")
         }
         if (r.derivingTypes.contains(DerivingType.Eq) && r.derivingTypes.contains(DerivingType.Ord)) {
-          //TODO base class?
           w.wl
           w.wl(s"friend bool operator<=(const $actualSelf& lhs, const $actualSelf& rhs);")
           w.wl(s"friend bool operator>=(const $actualSelf& lhs, const $actualSelf& rhs);")

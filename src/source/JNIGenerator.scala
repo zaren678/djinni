@@ -104,7 +104,9 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl
         val classLookup = q(jniMarshal.undecoratedTypename(ident, r))
         w.wl(s"const ::djinni::GlobalRef<jclass> clazz { ::djinni::jniFindClass($classLookup) };")
-        val constructorSig = q(jniMarshal.javaMethodSignature(r.fields, None))
+
+        val theCtorFields = getParentRecordFields(r) ++ r.fields;
+        val constructorSig = q(jniMarshal.javaMethodSignature(theCtorFields, None))
         w.wl(s"const jmethodID jconstructor { ::djinni::jniGetMethodID(clazz.get(), ${q("<init>")}, $constructorSig) };")
         for (f <- r.fields) {
           val javaFieldName = idJava.field(f.ident)
@@ -127,13 +129,33 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
       writeJniTypeParams(w, params)
       w.w(s"auto $jniHelperWithParams::fromCpp(JNIEnv* jniEnv, const CppType& c) -> ::djinni::LocalRef<JniType>").braced{
         //w.wl(s"::${spec.jniNamespace}::JniLocalScope jscope(jniEnv, 10);")
+
+        //dynamic cast to child types here
+        if( r.childTypes.nonEmpty ) {
+
+          r.childTypes.foreach(t => {
+            w.wl("{").nested {
+              val theFqName = "::" + spec.jniNamespace + "::" + cppMarshal.typename( t.ident.name, t.body) + cppTypeArgs(t.params)
+              w.wl("auto theChild = dynamic_cast<" + theFqName + "*>(c);")
+              w.wl("if (theChild != nullptr){").nested {
+                w.wl("return " + theFqName + "::fromCpp(jniEnv, *theChild);")
+              }
+              w.wl("}")
+            }
+            w.wl("{")
+          })
+        }
+
         if(r.fields.isEmpty) w.wl("(void)c; // Suppress warnings in release builds for empty records")
         w.wl(s"const auto& data = ::djinni::JniClass<$jniHelper>::get();")
         val call = "auto r = ::djinni::LocalRef<JniType>{jniEnv->NewObject("
         w.w(call + "data.clazz.get(), data.jconstructor")
-        if(r.fields.nonEmpty) {
+
+        val theParentFields = getParentRecordFields(r);
+        if(r.fields.nonEmpty || theParentFields.nonEmpty) {
+          val theFields = theParentFields ++ r.fields
           w.wl(",")
-          writeAlignedCall(w, " " * call.length(), r.fields, ")}", f => {
+          writeAlignedCall(w, " " * call.length(), theFields, ")}", f => {
             val name = idCpp.field(f.ident)
             val param = jniMarshal.fromCpp(f.ty, s"c.$name")
             s"::djinni::get($param)"
@@ -162,7 +184,18 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl(";")
       }
     }
-    writeJniFiles(origin, params.nonEmpty, ident, refs, writeJniPrototype, writeJniBody)
+
+    val AllInHeader = params.nonEmpty
+    r.childTypes.foreach(t =>{
+      val theIncludeStr = "#include " + q(spec.jniIncludeCppPrefix + spec.cppFileIdentStyle(t.ident.name) + "." + spec.cppHeaderExt)
+      if( AllInHeader ){
+        refs.jniHpp.add(theIncludeStr)
+      } else {
+        refs.jniCpp.add(theIncludeStr)
+      }
+    })
+
+    writeJniFiles(origin, AllInHeader, ident, refs, writeJniPrototype, writeJniBody)
   }
 
   override def generateInterface(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Interface) {
