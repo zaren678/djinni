@@ -132,17 +132,17 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
 
         //dynamic cast to child types here
         if( r.childTypes.nonEmpty ) {
-
           r.childTypes.foreach(t => {
             w.wl("{").nested {
-              val theFqName = "::" + spec.jniNamespace + "::" + cppMarshal.typename( t.ident.name, t.body) + cppTypeArgs(t.params)
-              w.wl("auto theChild = dynamic_cast<" + theFqName + "*>(c);")
+              val theFqJniName = "::" + spec.jniNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
+              val theFqCppName = "::" + spec.cppNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
+              w.wl("auto theChild = dynamic_cast<" + theFqCppName + "*>(c);")
               w.wl("if (theChild != nullptr){").nested {
-                w.wl("return " + theFqName + "::fromCpp(jniEnv, *theChild);")
+                w.wl("return " + theFqJniName + "::fromCpp(jniEnv, *theChild);")
               }
               w.wl("}")
             }
-            w.wl("{")
+            w.wl("}")
           })
         }
 
@@ -151,7 +151,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         val call = "auto r = ::djinni::LocalRef<JniType>{jniEnv->NewObject("
         w.w(call + "data.clazz.get(), data.jconstructor")
 
-        val theParentFields = getParentRecordFields(r);
+        val theParentFields = getParentRecordFields(r)
         if(r.fields.nonEmpty || theParentFields.nonEmpty) {
           val theFields = theParentFields ++ r.fields
           w.wl(",")
@@ -170,13 +170,25 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
       w.wl
       writeJniTypeParams(w, params)
       w.w(s"auto $jniHelperWithParams::toCpp(JNIEnv* jniEnv, JniType j) -> CppType").braced {
+        //dynamic cast to child types here
+        if( r.childTypes.nonEmpty ) {
+          r.childTypes.foreach(t => {
+            val theFqName = "::" + spec.jniNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
+            w.wl("if (jniEnv->IsInstanceOf(j,::djinni::JniClass<"+cppMarshal.typename(t.ident.name, t.body)+">::get()) {").nested {
+              w.wl("return " + theFqName + "::toCpp(jniEnv, j);")
+            }
+            w.wl("}")
+          } )
+        }
+
         w.wl(s"::djinni::JniLocalScope jscope(jniEnv, ${r.fields.size + 1});")
         w.wl(s"assert(j != nullptr);")
         if(r.fields.isEmpty)
           w.wl("(void)j; // Suppress warnings in release builds for empty records")
         else
           w.wl(s"const auto& data = ::djinni::JniClass<$jniHelper>::get();")
-        writeAlignedCall(w, "return {", r.fields, "}", f => {
+        val theFields = getParentRecordFields(r) ++ r.fields
+        writeAlignedCall(w, "return {", theFields, "}", f => {
           val fieldId = "data.field_" + idJava.field(f.ident)
           val jniFieldAccess = toJniCall(f.ty, (jt: String) => s"jniEnv->Get${jt}Field(j, $fieldId)")
           jniMarshal.toCpp(f.ty, jniFieldAccess)
