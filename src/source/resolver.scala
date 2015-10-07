@@ -75,11 +75,11 @@ def resolve(metas: Scope, idl: Seq[TypeDecl]): Option[Error] = {
 
     for (typeDecl <- idl) {
       resolveConst(typeDecl.body)
+      if( typeDecl.body.isInstanceOf[Record] ) resolveRecordDerivings( idl, typeDecl )
+    }
 
-      typeDecl.body match {
-        case r: Record => resolveRecordDerivings( idl, typeDecl )
-        case _ =>
-      }
+    for (typeDecl <- idl) {
+      if( typeDecl.body.isInstanceOf[Record] ) checkForCircularRecordDeriving( typeDecl )
     }
 
   }
@@ -274,13 +274,8 @@ private def resolveRecord(scope: Scope, r: Record) {
 
 private def resolveRecordDerivings( idl: Seq[TypeDecl], decl: TypeDecl ) {
 
-  var r: Record = null
-  decl.body match {
-    case r1: Record =>
-      r = r1
-    case _ =>
-      return;
-  }
+  if (!decl.body.isInstanceOf[Record]) return
+  val r: Record = decl.body.asInstanceOf[Record]
 
   //Make sure our record only derives from 1 other record excluding eq and ord
   val theNumberDerived = r.derivingTypes.count( d => !d.equals(DerivingType.Ord) && !d.equals(DerivingType.Eq) )
@@ -288,7 +283,7 @@ private def resolveRecordDerivings( idl: Seq[TypeDecl], decl: TypeDecl ) {
 
   for (d <- r.derivingTypes) {
     d match {
-      case s: String => {
+      case s: String =>
         val theTypeDecl = idl.find( t => t.ident.name.equals( s ) )
         if( theTypeDecl.isEmpty ) throw new Error( decl.ident.loc, decl.ident.name + s" derives from $s but $s is not defined" ).toException
         if( !theTypeDecl.get.body.isInstanceOf[Record] ) throw new Error( decl.ident.loc, "Records can only derive from other records" ).toException
@@ -303,9 +298,22 @@ private def resolveRecordDerivings( idl: Seq[TypeDecl], decl: TypeDecl ) {
 
         r.parentType = theTypeDecl.get
         theParentRecord.childTypes = theParentRecord.childTypes :+ decl
-      }
       case _ =>
     }
+  }
+}
+
+private def checkForCircularRecordDeriving(typeDecl: TypeDecl) {
+  if (!typeDecl.body.isInstanceOf[Record]) return
+  val r: Record = typeDecl.body.asInstanceOf[Record]
+
+  var parent = r.parentType
+  while (parent != null){
+    if( parent.ident.name.equals( typeDecl.ident.name ) ) {
+      throw new Error( typeDecl.ident.loc, "Record " + parent.ident.name + " derives from itself" ).toException
+    }
+    val parentRecord = parent.body.asInstanceOf[Record]
+    parent = parentRecord.parentType
   }
 }
 
