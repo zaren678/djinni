@@ -100,6 +100,7 @@ class YamlGenerator(spec: Spec) extends Generator(spec) {
         r.derivingTypes.collect {
           case Record.DerivingType.Eq => "eq"
           case Record.DerivingType.Ord => "ord"
+          case s:String => spec.yamlPrefix + s
         }.mkString(" deriving(", ", ", ")")
       }
     }
