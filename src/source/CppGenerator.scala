@@ -218,6 +218,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
           writeAlignedCall(w, actualSelf + "(", theFields, ")", f => marshal.fieldType(f.ty) + " " + idCpp.local(f.ident) + "_")
           w.wl
           val init = (f: Field) => idCpp.field(f.ident) + "(std::move(" + idCpp.local(f.ident) + "_))"
+          var recordFields = r.fields
           if( theParentFields.nonEmpty ){
             w.w( ": BaseClass(")
             val skipFirst = SkipFirst()
@@ -225,12 +226,15 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
               skipFirst { w.w(",") }
               w.w( "std::move(" +idCpp.field(f.ident) + "_)")
             }
-            w.wl( ")," )
+            w.wl( ")" )
           } else {
-            w.w(": ")
+            w.wl(": " + init(r.fields.head))
+            recordFields = r.fields.slice(1, r.fields.size)
           }
-          w.w(init(r.fields.head))
-          r.fields.tail.map(f => ", " + init(f)).foreach(w.wl)
+
+          recordFields.foreach(f =>{
+            w.wl( ", " + init(f))
+          })
           w.wl("{}")
         }
 
