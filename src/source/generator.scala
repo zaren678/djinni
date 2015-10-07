@@ -337,6 +337,18 @@ abstract class Generator(spec: Spec)
     theFields
   }
 
+  def getParentRecordTypes(r: Record): Seq[TypeDecl] = {
+    var theParents = Seq[TypeDecl]()
+
+    var theParent = r.parentType
+    while (theParent != null){
+      val theParentRecord = theParent.body.asInstanceOf[Record]
+      theParents = theParents :+ theParent
+      theParent = theParentRecord.parentType
+    }
+    theParents
+  }
+
   // --------------------------------------------------------------------------
   // Render type expression
 

@@ -244,7 +244,8 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
           w.wl
           // Defining the dtor disables implicit copy/move operation generation, so re-enable them
           // Make them protected to avoid slicing
-          w.wlOutdent("protected:")
+          //FIXME making this public to fix an issue in jni with constrution... go back and review later
+          w.wlOutdent("public:")
           w.wl(s"$actualSelf(const $actualSelf&) = default;")
           w.wl(s"$actualSelf($actualSelf&&) = default;")
           w.wl(s"$actualSelf& operator=(const $actualSelf&) = default;")

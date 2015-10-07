@@ -98,7 +98,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j);")
         w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, const CppType& c);")
         w.wl
-        w.wlOutdent("private:")
+        w.wlOutdent("public:")
         w.wl(s"$jniHelper();")
         w.wl(s"friend ::djinni::JniClass<$jniHelper>;")
         w.wl
@@ -126,6 +126,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
       w.wl(s"$jniHelperWithParams::~$jniHelper() = default;")
       w.wl
 
+      val theParentFields = getParentRecordFields(r)
       writeJniTypeParams(w, params)
       w.w(s"auto $jniHelperWithParams::fromCpp(JNIEnv* jniEnv, const CppType& c) -> ::djinni::LocalRef<JniType>").braced{
         //w.wl(s"::${spec.jniNamespace}::JniLocalScope jscope(jniEnv, 10);")
@@ -133,10 +134,11 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         //dynamic cast to child types here
         if( r.childTypes.nonEmpty ) {
           r.childTypes.foreach(t => {
+            val childJniHelper = jniMarshal.helperClass(t.ident)
             w.wl("{").nested {
-              val theFqJniName = "::" + spec.jniNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
+              val theFqJniName = "::" + spec.jniNamespace + "::" + childJniHelper + cppTypeArgs(t.params)
               val theFqCppName = "::" + spec.cppNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
-              w.wl("auto theChild = dynamic_cast<" + theFqCppName + "*>(c);")
+              w.wl("auto theChild = dynamic_cast< const " + theFqCppName + "*>(&c);")
               w.wl("if (theChild != nullptr){").nested {
                 w.wl("return " + theFqJniName + "::fromCpp(jniEnv, *theChild);")
               }
@@ -151,7 +153,7 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         val call = "auto r = ::djinni::LocalRef<JniType>{jniEnv->NewObject("
         w.w(call + "data.clazz.get(), data.jconstructor")
 
-        val theParentFields = getParentRecordFields(r)
+
         if(r.fields.nonEmpty || theParentFields.nonEmpty) {
           val theFields = theParentFields ++ r.fields
           w.wl(",")
@@ -173,33 +175,82 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         //dynamic cast to child types here
         if( r.childTypes.nonEmpty ) {
           r.childTypes.foreach(t => {
-            val theFqName = "::" + spec.jniNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
-            w.wl("if (jniEnv->IsInstanceOf(j,::djinni::JniClass<"+cppMarshal.typename(t.ident.name, t.body)+">::get()) {").nested {
-              w.wl("return " + theFqName + "::toCpp(jniEnv, j);")
+            val childJniHelper = jniMarshal.helperClass(t.ident)
+            w.wl(s"if (jniEnv->IsInstanceOf(j,::djinni::JniClass<$childJniHelper>::get().clazz.get())) {").nested {
+              w.wl("return ::" + spec.jniNamespace + "::" + childJniHelper + "::toCpp(jniEnv, j);")
             }
             w.wl("}")
           } )
         }
 
-        w.wl(s"::djinni::JniLocalScope jscope(jniEnv, ${r.fields.size + 1});")
+        w.wl(s"::djinni::JniLocalScope jscope(jniEnv, ${r.fields.size + theParentFields.size + 1});")
         w.wl(s"assert(j != nullptr);")
-        if(r.fields.isEmpty)
-          w.wl("(void)j; // Suppress warnings in release builds for empty records")
-        else
-          w.wl(s"const auto& data = ::djinni::JniClass<$jniHelper>::get();")
         val theFields = getParentRecordFields(r) ++ r.fields
-        writeAlignedCall(w, "return {", theFields, "}", f => {
-          val fieldId = "data.field_" + idJava.field(f.ident)
-          val jniFieldAccess = toJniCall(f.ty, (jt: String) => s"jniEnv->Get${jt}Field(j, $fieldId)")
-          jniMarshal.toCpp(f.ty, jniFieldAccess)
+        if(theFields.isEmpty) {
+          w.wl("(void)j; // Suppress warnings in release builds for empty records")
+        } else {
+          w.wl(s"const auto& data = ::djinni::JniClass<$jniHelper>::get();")
+        }
+
+        val parentToNameMap = mutable.HashMap.empty[String,Record]
+        val theParents = getParentRecordTypes(r)
+        var count = 1
+        theParents.foreach( p => {
+          val parentJniHelper = jniMarshal.helperClass(p.ident)
+          val theParentDataName = s"parent${count}Data"
+          parentToNameMap += (theParentDataName -> p.body.asInstanceOf[Record])
+          w.wl(s"const auto& $theParentDataName = ::djinni::JniClass<$parentJniHelper>::get();")
+          count += 1
         })
+
+        w.w( "return {" )
+
+        val skipFirst = new SkipFirst
+        theFields.foreach( f => {
+          var theDataName = "data"
+          theParents.foreach( p => {
+            val theParentRecord = p.body.asInstanceOf[Record]
+
+            if( theParentRecord.fields.contains( f ) ) {
+              parentToNameMap.foreach( tuple => {
+                if( tuple._2.equals( theParentRecord ) ){
+                  theDataName = tuple._1
+                }
+              })
+            }
+          })
+
+          val fieldId = s"$theDataName.field_" + idJava.field(f.ident)
+          val jniFieldAccess = toJniCall(f.ty, (jt: String) => s"jniEnv->Get${jt}Field(j, $fieldId)")
+          skipFirst { w.w( "        " ) }
+          if( f.equals(theFields.last)){
+            w.w(jniMarshal.toCpp(f.ty, jniFieldAccess))
+          } else {
+            w.wl(jniMarshal.toCpp(f.ty, jniFieldAccess) + ",")
+          }
+        })
+
+        w.w( "}" )
         w.wl(";")
       }
     }
 
     val AllInHeader = params.nonEmpty
     r.childTypes.foreach(t =>{
-      val theIncludeStr = "#include " + q(spec.jniIncludeCppPrefix + spec.cppFileIdentStyle(t.ident.name) + "." + spec.cppHeaderExt)
+      val theCppIncludeStr = "#include " + q(spec.jniIncludeCppPrefix + spec.cppFileIdentStyle(t.ident.name) + "." + spec.cppHeaderExt)
+      val theJniIncludeStr = "#include " + q(spec.jniIncludeCppPrefix + spec.jniFileIdentStyle(t.ident.name) + "." + spec.cppHeaderExt)
+      if( AllInHeader ){
+        refs.jniHpp.add(theCppIncludeStr)
+        refs.jniHpp.add(theJniIncludeStr)
+      } else {
+        refs.jniCpp.add(theCppIncludeStr)
+        refs.jniCpp.add(theJniIncludeStr)
+      }
+    })
+
+    val theParents = getParentRecordTypes(r)
+    theParents.foreach( p => {
+      val theIncludeStr = "#include " + q(spec.jniIncludeCppPrefix + spec.jniFileIdentStyle(p.ident.name) + "." + spec.cppHeaderExt)
       if( AllInHeader ){
         refs.jniHpp.add(theIncludeStr)
       } else {
