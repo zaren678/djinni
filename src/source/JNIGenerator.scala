@@ -98,10 +98,11 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j);")
         w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, const CppType& c);")
         w.wl
-        w.wlOutdent("public:")
+        w.wlOutdent("private:")
         w.wl(s"$jniHelper();")
         w.wl(s"friend ::djinni::JniClass<$jniHelper>;")
         w.wl
+        w.wlOutdent("public:")
         val classLookup = q(jniMarshal.undecoratedTypename(ident, r))
         w.wl(s"const ::djinni::GlobalRef<jclass> clazz { ::djinni::jniFindClass($classLookup) };")
 

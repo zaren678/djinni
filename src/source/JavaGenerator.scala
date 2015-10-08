@@ -266,7 +266,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
               skipFirst {
                 w.w(",")
               }
-              w.w(idJava.field(f.ident))
+              w.w(idJava.local(f.ident))
             }
             w.wl(");")
           }
@@ -380,9 +380,11 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
         w.wl("@Override")
         w.w("public String toString()").braced {
           w.w(s"return ").nestedN(2) {
-            w.wl(s""""$self{" +""")
+            w.w(s""""$self{" +""")
             if( theParentType != null ) {
-              w.wl("super.toString() +")
+              w.wl(" super.toString() +")
+            } else {
+              w.wl
             }
             for (i <- r.fields.indices) {
               val name = idJava.field(r.fields(i).ident)
