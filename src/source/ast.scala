@@ -71,12 +71,12 @@ case class Record( ext: Ext,
                    consts: Seq[Const],
                    derivingTypes: Set[Object],
                    var childTypes: List[TypeDecl],
-                   var parentType: TypeDecl) extends TypeDef {
+                   var parentType: Option[TypeDecl]) extends TypeDef {
 
   //Need to override toString here to prevent stack overflow
   override def toString = {
     val theChildNames = if (childTypes.isEmpty) List[String]() else childTypes.map(t => t.ident.name)
-    val theParentName = if (parentType == null) "None" else parentType.ident.name
+    val theParentName = if (parentType.isEmpty) "None" else parentType.get.ident.name
 
     s"Record(Ext($ext),Fields($fields),Consts($consts),DerivingTypes($derivingTypes),ChildTypes($theChildNames),ParentType($theParentName))"
   }

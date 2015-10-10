@@ -218,10 +218,10 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
       val self = marshal.typename(javaName, r)
 
       val theParentType = r.parentType
-      val theParentRecord = if (theParentType != null) r.parentType.body.asInstanceOf[Record] else null
+      val theParentRecord = if (theParentType.isDefined) r.parentType.get.body.asInstanceOf[Record] else null
       val extendsFlag = if (theParentRecord != null) {
-        val theParentJavaName = if (theParentRecord.ext.java) theParentType.ident.name + "_base" else theParentType.ident.name
-        s" extends " + marshal.typename(theParentJavaName, theParentType.body)
+        val theParentJavaName = if (theParentRecord.ext.java) theParentType.get.ident.name + "_base" else theParentType.get.ident.name
+        s" extends " + marshal.typename(theParentJavaName, theParentType.get.body)
       } else {
         ""
       }

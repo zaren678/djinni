@@ -296,7 +296,7 @@ private def resolveRecordDerivings( idl: Seq[TypeDecl], decl: TypeDecl ) {
           throw new Error( decl.ident.loc, "Record "+ decl.ident.name + " derives from ord but parent does not, consider adding ord to parent record" ).toException
         }
 
-        r.parentType = theTypeDecl.get
+        r.parentType = Some(theTypeDecl.get)
         theParentRecord.childTypes = theParentRecord.childTypes :+ decl
       case _ =>
     }
@@ -308,11 +308,11 @@ private def checkForCircularRecordDeriving(typeDecl: TypeDecl) {
   val r: Record = typeDecl.body.asInstanceOf[Record]
 
   var parent = r.parentType
-  while (parent != null){
-    if( parent.ident.name.equals( typeDecl.ident.name ) ) {
-      throw new Error( typeDecl.ident.loc, "Record " + parent.ident.name + " derives from itself" ).toException
+  while (parent.isDefined){
+    if( parent.get.ident.name.equals( typeDecl.ident.name ) ) {
+      throw new Error( typeDecl.ident.loc, "Record " + parent.get.ident.name + " derives from itself" ).toException
     }
-    val parentRecord = parent.body.asInstanceOf[Record]
+    val parentRecord = parent.get.body.asInstanceOf[Record]
     parent = parentRecord.parentType
   }
 }

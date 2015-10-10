@@ -329,8 +329,8 @@ abstract class Generator(spec: Spec)
     var theFields = Seq[Field]()
 
     var theParent = r.parentType
-    while (theParent != null){
-      val theParentRecord = theParent.body.asInstanceOf[Record]
+    while (theParent.isDefined){
+      val theParentRecord = theParent.get.body.asInstanceOf[Record]
       theFields = theParentRecord.fields ++ theFields
       theParent = theParentRecord.parentType
     }
@@ -341,9 +341,9 @@ abstract class Generator(spec: Spec)
     var theParents = Seq[TypeDecl]()
 
     var theParent = r.parentType
-    while (theParent != null){
-      val theParentRecord = theParent.body.asInstanceOf[Record]
-      theParents = theParents :+ theParent
+    while (theParent.isDefined){
+      val theParentRecord = theParent.get.body.asInstanceOf[Record]
+      theParents = theParents :+ theParent.get
       theParent = theParentRecord.parentType
     }
     theParents

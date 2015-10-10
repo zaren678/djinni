@@ -146,10 +146,10 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
     }
 
     val theParentType = r.parentType
-    val theParentRecord = if (theParentType != null) r.parentType.body.asInstanceOf[Record] else null
+    val theParentRecord = if (theParentType.isDefined) r.parentType.get.body.asInstanceOf[Record] else null
 
     val theParentCppName = if (theParentRecord != null) {
-      if (theParentRecord.ext.cpp) theParentType.ident.name + "_base" else theParentType.ident.name
+      if (theParentRecord.ext.cpp) theParentType.get.ident.name + "_base" else theParentType.get.ident.name
     } else {
       ""
     }
@@ -164,12 +164,12 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
       writeCppTypeParams(w, params)
 
       val qualifiedParentName = if( theParentRecord != null ){
-        if( theParentType.isInstanceOf[ExternTypeDecl] ){
+        if( theParentType.get.isInstanceOf[ExternTypeDecl] ){
           //TODO check if external typedecl and use namespace
-          marshal.typename(theParentCppName, theParentType.body)
+          marshal.typename(theParentCppName, theParentType.get.body)
         }
         else{
-          marshal.typename(theParentCppName, theParentType.body)
+          marshal.typename(theParentCppName, theParentType.get.body)
         }
 
       } else {
@@ -184,7 +184,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
       w.w("struct " + actualSelf + cppFinal + extendsFlag).bracedSemi {
         if( theParentType != null ) {
           //put a using so that using the baseclass is easier to use
-          w.wl(s"using BaseClass = ${qualifiedParentName};")
+          w.wl(s"using BaseClass = $qualifiedParentName;")
         }
 
         generateHppConstants(w, r.consts)

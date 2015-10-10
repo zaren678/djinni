@@ -102,7 +102,7 @@ private object IdlParser extends RegexParsers {
               consts = consts,
               derivingTypes = derivingTypes,
               childTypes = List(),
-              parentType = null)
+              parentType = None)
     }
   }
   def field: Parser[Field] = doc ~ ident ~ ":" ~ typeRef ^^ {
@@ -140,7 +140,7 @@ private object IdlParser extends RegexParsers {
                                  List(),
                                  deriving.getOrElse(Set[Object]()),
                                  List(),
-                                 null )
+                                 None )
   }
   def externInterface: Parser[Interface] = interfaceHeader ^^ { case ext => Interface(ext, List(), List()) }
 
