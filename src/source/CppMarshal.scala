@@ -87,7 +87,13 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
       case d: MDef =>
         d.defType match {
           case DEnum => withNs(namespace, idCpp.enumType(d.name))
-          case DRecord => withNs(namespace, idCpp.ty(d.name))
+          case DRecord =>{
+            if (meta.isDerivingRecord(d)){
+              "std::unique_ptr<" + withNs( namespace, idCpp.ty(d.name)) + ">"
+            } else {
+              withNs(namespace, idCpp.ty(d.name))
+            }
+          }
           case DInterface => s"std::shared_ptr<${withNs(namespace, idCpp.ty(d.name))}>"
         }
       case e: MExtern => e.defType match {
@@ -137,6 +143,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
     case p: MPrimitive => true
     case d: MDef => d.defType match {
       case DEnum => true
+      case DRecord => !meta.isDerivingRecord(tm)
       case _  => false
     }
     case e: MExtern => e.defType match {

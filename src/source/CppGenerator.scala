@@ -325,11 +325,11 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
 
   override def generateInterface(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Interface) {
     val refs = new CppRefs(ident.name)
-    i.methods.map(m => {
-      m.params.map(p => refs.find(p.ty))
+    i.methods.foreach(m => {
+      m.params.foreach(p => refs.find(p.ty))
       m.ret.foreach(refs.find)
     })
-    i.consts.map(c => {
+    i.consts.foreach(c => {
       refs.find(c.ty)
     })
 

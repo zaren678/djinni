@@ -79,6 +79,9 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
 
   override def generateRecord(origin: String, ident: Ident, doc: Doc, params: Seq[TypeParam], r: Record) {
     val refs = new JNIRefs(ident.name)
+    if( r.isDeriving ){
+      refs.jniHpp.add("#include <memory>") //for unique_ptr
+    }
     r.fields.foreach(f => refs.find(f.ty))
 
     val jniHelper = jniMarshal.helperClass(ident)
@@ -88,7 +91,11 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
       writeJniTypeParams(w, params)
       w.w(s"class $jniHelper final").bracedSemi {
         w.wlOutdent("public:")
-        w.wl(s"using CppType = $cppSelf;")
+        if (r.isDeriving){
+          w.wl(s"using CppType = std::unique_ptr<$cppSelf>;")
+        } else {
+          w.wl(s"using CppType = $cppSelf;")
+        }
         w.wl(s"using JniType = jobject;")
         w.wl
         w.wl(s"using Boxed = $jniHelper;")
@@ -139,9 +146,9 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
             w.wl("{").nested {
               val theFqJniName = "::" + spec.jniNamespace + "::" + childJniHelper + cppTypeArgs(t.params)
               val theFqCppName = "::" + spec.cppNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
-              w.wl("auto theChild = dynamic_cast< const " + theFqCppName + "*>(&c);")
+              w.wl("auto theChild = std::dynamic_pointer_cast<" + theFqCppName + ">(c);")
               w.wl("if (theChild != nullptr){").nested {
-                w.wl("return " + theFqJniName + "::fromCpp(jniEnv, *theChild);")
+                w.wl("return " + theFqJniName + "::fromCpp(jniEnv, theChild);")
               }
               w.wl("}")
             }
@@ -155,12 +162,13 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.w(call + "data.clazz.get(), data.jconstructor")
 
 
+        val theDereferenceOperator = if (r.isDeriving) "->" else "."
         if(r.fields.nonEmpty || theParentFields.nonEmpty) {
           val theFields = theParentFields ++ r.fields
           w.wl(",")
           writeAlignedCall(w, " " * call.length(), theFields, ")}", f => {
             val name = idCpp.field(f.ident)
-            val param = jniMarshal.fromCpp(f.ty, s"c.$name")
+            val param = jniMarshal.fromCpp(f.ty, s"c$theDereferenceOperator$name")
             s"::djinni::get($param)"
           })
         }
@@ -204,7 +212,11 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
           count += 1
         })
 
-        w.w( "return {" )
+        if (r.isDeriving) {
+          w.w("return std::make_unique<CppType::element_type>(")
+        } else {
+          w.w("return {")
+        }
 
         val skipFirst = new SkipFirst
         theFields.foreach( f => {
@@ -231,7 +243,11 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
           }
         })
 
-        w.w( "}" )
+        if (r.isDeriving) {
+          w.w(")")
+        } else {
+          w.w("}")
+        }
         w.wl(";")
       }
     }

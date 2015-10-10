@@ -16,7 +16,7 @@
 
 package djinni
 
-import djinni.ast.TypeDef
+import djinni.ast.{Record, TypeDef}
 import scala.collection.immutable
 
 package object meta {
@@ -108,5 +108,24 @@ def isInterface(ty: MExpr): Boolean = {
 
 def isOptionalInterface(ty: MExpr): Boolean = {
   ty.base == MOptional && ty.args.length == 1 && isInterface(ty.args.head)
+}
+
+def isRecord(ty: MExpr): Boolean = {
+  ty.base match {
+    case d: MDef => d.defType == DRecord
+    case _ => false
+  }
+}
+
+def isDerivingRecord(ty: MExpr): Boolean = {
+  if (isRecord(ty)) {
+    isDerivingRecord(ty.base.asInstanceOf[MDef])
+  }
+  false
+}
+
+def isDerivingRecord(ty: MDef): Boolean = {
+  val theRecord = ty.body.asInstanceOf[Record]
+  theRecord != null && theRecord.isDeriving
 }
 }

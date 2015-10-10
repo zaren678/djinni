@@ -44,7 +44,7 @@ def resolve(metas: Scope, idl: Seq[TypeDecl]): Option[Error] = {
 
       def defType = typeDecl.body match {
         case e: Enum =>
-          if (!typeDecl.params.isEmpty) {
+          if (typeDecl.params.nonEmpty) {
             throw Error(typeDecl.ident.loc, "enums can't have type parameters").toException
           }
           DEnum

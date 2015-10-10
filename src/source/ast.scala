@@ -73,6 +73,9 @@ case class Record( ext: Ext,
                    var childTypes: List[TypeDecl],
                    var parentType: Option[TypeDecl]) extends TypeDef {
 
+  def isDeriving: Boolean = {
+    parentType.isDefined || childTypes.nonEmpty
+  }
   //Need to override toString here to prevent stack overflow
   override def toString = {
     val theChildNames = if (childTypes.isEmpty) List[String]() else childTypes.map(t => t.ident.name)
