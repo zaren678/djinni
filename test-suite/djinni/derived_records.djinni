@@ -1,12 +1,12 @@
 grand_parent_record = record {
     grandparent_key1: i32;
     grandparent_key2: string;
-}
+} deriving( eq )
 
 parent_record = record {
     parent_key: i32;
-} deriving( grand_parent_record )
+} deriving( eq, grand_parent_record )
 
 child_record = record {
     child_key: i32;
-} deriving( parent_record )
+} deriving( eq, parent_record )
