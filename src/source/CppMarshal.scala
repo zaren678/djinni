@@ -143,7 +143,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
     case p: MPrimitive => true
     case d: MDef => d.defType match {
       case DEnum => true
-      case DRecord => !meta.isDerivingRecord(tm)
+      case DRecord => meta.isDerivingRecord(tm)
       case _  => false
     }
     case e: MExtern => e.defType match {
@@ -157,7 +157,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
 
   def byValue(td: TypeDecl): Boolean = td.body match {
     case i: Interface => false
-    case r: Record => false
+    case r: Record => r.isDeriving
     case e: Enum => true
   }
 

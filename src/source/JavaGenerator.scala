@@ -325,7 +325,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
                 }
               }
 
-              if( theParentType != null ){
+              if( theParentType.isDefined ){
                 skipFirst { w.wl(" &&") }
                 w.w( "super.equals(other)" )
               }
@@ -344,7 +344,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
             w.wl("int hashCode = 17;")
             // Also pick an arbitrary prime to use as the multiplier.
             val multiplier = "31"
-            if( theParentType != null ){
+            if( theParentType.isDefined ){
               w.wl( s"hashCode = hashCode * $multiplier + super.hashCode();" )
             }
             for (f <- r.fields) {
@@ -381,7 +381,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
         w.w("public String toString()").braced {
           w.w(s"return ").nestedN(2) {
             w.w(s""""$self{" +""")
-            if( theParentType != null ) {
+            if( theParentType.isDefined ) {
               w.wl(" super.toString() +")
             } else {
               w.wl
@@ -414,7 +414,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
           val nonnullAnnotation = javaNonnullAnnotation.map(_ + " ").getOrElse("")
           w.w(s"public int compareTo($nonnullAnnotation$self other) ").braced {
             w.wl("int tempResult;")
-            if( theParentType != null ){
+            if( theParentType.isDefined ){
               w.wl("tempResult = super.compareTo(other)")
               w.w("if (tempResult != 0)").braced {
                 w.wl("return tempResult;")

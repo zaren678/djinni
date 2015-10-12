@@ -103,13 +103,14 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
         w.wl(s"~$jniHelper();")
         w.wl
         w.wl(s"static CppType toCpp(JNIEnv* jniEnv, JniType j);")
-        w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, const CppType& c);")
+        val (const, byRef) = if (r.isDeriving) ("","") else ("const ","&")
+        w.wl(s"static ::djinni::LocalRef<JniType> fromCpp(JNIEnv* jniEnv, ${const}CppType$byRef c);")
         w.wl
         w.wlOutdent("private:")
         w.wl(s"$jniHelper();")
         w.wl(s"friend ::djinni::JniClass<$jniHelper>;")
         w.wl
-        w.wlOutdent("public:")
+        if (r.isDeriving) w.wlOutdent("public:")
         val classLookup = q(jniMarshal.undecoratedTypename(ident, r))
         w.wl(s"const ::djinni::GlobalRef<jclass> clazz { ::djinni::jniFindClass($classLookup) };")
 
@@ -136,21 +137,19 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
 
       val theParentFields = getParentRecordFields(r)
       writeJniTypeParams(w, params)
-      w.w(s"auto $jniHelperWithParams::fromCpp(JNIEnv* jniEnv, const CppType& c) -> ::djinni::LocalRef<JniType>").braced{
+      val (const, byRef) = if (r.isDeriving) ("","") else ("const ","&")
+      w.w(s"auto $jniHelperWithParams::fromCpp(JNIEnv* jniEnv, ${const}CppType$byRef c) -> ::djinni::LocalRef<JniType>").braced{
         //w.wl(s"::${spec.jniNamespace}::JniLocalScope jscope(jniEnv, 10);")
 
         //dynamic cast to child types here
         if( r.childTypes.nonEmpty ) {
           r.childTypes.foreach(t => {
             val childJniHelper = jniMarshal.helperClass(t.ident)
-            w.wl("{").nested {
-              val theFqJniName = "::" + spec.jniNamespace + "::" + childJniHelper + cppTypeArgs(t.params)
-              val theFqCppName = "::" + spec.cppNamespace + "::" + cppMarshal.typename(t.ident.name, t.body) + cppTypeArgs(t.params)
-              w.wl("auto theChild = std::dynamic_pointer_cast<" + theFqCppName + ">(c);")
-              w.wl("if (theChild != nullptr){").nested {
-                w.wl("return " + theFqJniName + "::fromCpp(jniEnv, theChild);")
-              }
-              w.wl("}")
+            val theFqJniName = "::" + spec.jniNamespace + "::" + childJniHelper + cppTypeArgs(t.params)
+            val theFqCppName = cppMarshal.fqTypename(t.ident.name, t.body)
+            w.wl("if (auto theChild = dynamic_cast<" + theFqCppName + "*>(c.get())) {").nested {
+              w.wl("c.release();")
+              w.wl("return " + theFqJniName + s"::fromCpp(jniEnv, std::move(std::unique_ptr<$theFqCppName>(theChild)));")
             }
             w.wl("}")
           })

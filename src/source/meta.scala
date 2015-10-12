@@ -119,7 +119,7 @@ def isRecord(ty: MExpr): Boolean = {
 
 def isDerivingRecord(ty: MExpr): Boolean = {
   if (isRecord(ty)) {
-    isDerivingRecord(ty.base.asInstanceOf[MDef])
+    return isDerivingRecord(ty.base.asInstanceOf[MDef])
   }
   false
 }

@@ -145,4 +145,8 @@ std::vector<uint8_t> TestHelpers::id_binary(const std::vector<uint8_t> & v) {
     return v;
 }
 
+std::unique_ptr<GrandParentRecord> TestHelpers::get_derived_record(std::unique_ptr<ChildRecord> r){
+    return std::move(r);
+}
+
 } // namespace testsuite

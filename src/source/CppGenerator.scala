@@ -182,7 +182,7 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
       }
 
       w.w("struct " + actualSelf + cppFinal + extendsFlag).bracedSemi {
-        if( theParentType != null ) {
+        if( theParentType.isDefined ) {
           //put a using so that using the baseclass is easier to use
           w.wl(s"using BaseClass = $qualifiedParentName;")
         }
